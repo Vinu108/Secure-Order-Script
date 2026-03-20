@@ -1,0 +1,146 @@
+document.addEventListener('DOMContentLoaded', function () {
+
+  const btn = document.getElementById('entry-pack-button');
+  if (!btn) return;
+
+  // ===============================
+  // 🧠 PAGE ROUTING CONFIG (SLUG BASED)
+  // ===============================
+  const secureOrderPages = [
+    'new-pur-1',
+    'new-pur-4',
+    'new-pur-6',
+    'new-pur-9',
+    'new-lead-1',
+    'new-lead-2',
+    'new-lead-3',
+    'new-lead-4',
+    'new-lead-9'
+  ];
+
+  const nativeCheckoutPages = [
+    'ol-welcome-blast',
+    'welcome-blast',
+    'new-pur-free-bonus-1',
+    'new-pur-free-bonus-2',
+    'new-pur-free-bonus-3',
+    'new-lead-free-bonus-1',
+    'new-lead-free-bonus-2',
+    'new-lead-free-bonus-3',
+    'new-lead-free-bonus-4',
+    'new-lead-free-bonus-5',
+    'new-lead-free-bonus-6'
+  ];
+
+  btn.addEventListener('click', async function (e) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    try {
+      let variantId = null;
+
+      // ===============================
+      // ✅ EXTRACT VARIANT ID (HREF)
+      // ===============================
+      const href = btn.getAttribute('href');
+
+      if (href) {
+        const returnTo = new URL(href).searchParams.get("return_to");
+
+        if (returnTo) {
+          const decoded = decodeURIComponent(returnTo);
+          variantId = decoded.match(/id\]=(\d+)/)?.[1];
+        }
+      }
+
+      // ===============================
+      // ✅ EXTRACT VARIANT ID (ONCLICK)
+      // ===============================
+      if (!variantId) {
+        const onclickAttr = btn.getAttribute('onclick');
+
+        if (onclickAttr) {
+          const matches = onclickAttr.match(/'(\d+)'/g);
+
+          if (matches) {
+            const ids = matches.map(id => id.replace(/'/g, ''));
+            variantId = ids.find(id => id.length > 10);
+          }
+        }
+      }
+
+      // ===============================
+      // ❌ FAIL SAFE
+      // ===============================
+      if (!variantId) {
+        console.error("❌ Variant ID not found");
+        return;
+      }
+
+      console.log("✅ Variant ID:", variantId);
+
+      // ===============================
+      // 🛒 CART FLOW
+      // ===============================
+      await fetch('/cart/clear.js');
+
+      await fetch('/cart/add.js', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: [{
+            id: variantId,
+            quantity: 1
+          }]
+        })
+      });
+
+      // ===============================
+      // 🧭 PERFECT URL DETECTION
+      // ===============================
+      let currentPath = window.location.pathname.toLowerCase();
+
+      if (currentPath.endsWith('/')) {
+        currentPath = currentPath.slice(0, -1);
+      }
+
+      const pageSlug = currentPath.split('/').pop();
+
+      console.log("📄 Page Slug:", pageSlug);
+
+      // ===============================
+      // 🚀 SECURE ORDER (PHOENIX)
+      // ===============================
+      if (secureOrderPages.includes(pageSlug)) {
+        console.log("🚀 Secure Order Checkout");
+
+        if (typeof window.phxCheckout === "function") {
+          await window.phxCheckout();
+        } else {
+          console.warn("Phoenix not found");
+        }
+        return;
+      }
+
+      // ===============================
+      // 🛒 NATIVE CHECKOUT
+      // ===============================
+      if (nativeCheckoutPages.includes(pageSlug)) {
+        console.log("🛒 Native Checkout");
+        window.location.href = '/checkout';
+        return;
+      }
+
+      // ===============================
+      // ⚠️ DEFAULT FALLBACK
+      // ===============================
+      console.warn("No match → default native checkout");
+      window.location.href = '/checkout';
+
+    } catch (err) {
+      console.error("❌ Checkout failed", err);
+    }
+
+  }, true);
+
+});
